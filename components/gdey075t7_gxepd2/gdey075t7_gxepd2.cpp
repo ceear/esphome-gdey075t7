@@ -57,6 +57,12 @@ void GDEY075T7GxEPD2::dump_config() {
   }
 }
 
+void GDEY075T7GxEPD2::on_safe_shutdown() {
+  if (this->epd_ != nullptr) {
+    this->epd_->hibernate();
+  }
+}
+
 void GDEY075T7GxEPD2::update() {
   this->do_update_();
   this->flush_to_panel_();

@@ -23,6 +23,7 @@ class GDEY075T7GxEPD2 : public display::DisplayBuffer {
   void setup() override;
   void update() override;
   void dump_config() override;
+  void on_safe_shutdown() override;
 
   float get_setup_priority() const override { return setup_priority::PROCESSOR; }
 
