@@ -1,0 +1,22 @@
+# Python virtualenv
+.venv/
+venv/
+env/
+
+# ESPHome build artefacts (written next to the config yaml)
+.esphome/
+components/gdey075t7_gxepd2/example/.esphome/
+
+# PlatformIO build output (lives inside .esphome but also standalone)
+.pioenvs/
+.piolibdeps/
+
+# ESPHome secrets (may contain real credentials)
+secrets.yaml
+**/secrets.yaml
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

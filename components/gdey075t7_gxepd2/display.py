@@ -19,10 +19,20 @@ CONF_MOSI_PIN = "mosi_pin"
 gdey075t7_ns = cg.esphome_ns.namespace("gdey075t7_gxepd2")
 GDEY075T7GxEPD2 = gdey075t7_ns.class_(
     "GDEY075T7GxEPD2",
+    cg.PollingComponent,
     display.DisplayBuffer,
 )
 
-CONFIG_SCHEMA = (
+
+def _validate_arduino(config):
+    if not (CORE.is_esp32 and CORE.using_arduino):
+        raise cv.Invalid(
+            "gdey075t7_gxepd2 requires an ESP32 board with the Arduino framework"
+        )
+    return config
+
+
+CONFIG_SCHEMA = cv.All(
     display.FULL_DISPLAY_SCHEMA.extend(
         {
             cv.GenerateID(): cv.declare_id(GDEY075T7GxEPD2),
@@ -33,10 +43,17 @@ CONFIG_SCHEMA = (
             cv.Required(CONF_CLK_PIN): pins.internal_gpio_output_pin_schema,
             cv.Required(CONF_MOSI_PIN): pins.internal_gpio_output_pin_schema,
         }
-    ).extend(cv.polling_component_schema("60s"))
+    ).extend(cv.polling_component_schema("60s")),
+    _validate_arduino,
 )
 
 async def to_code(config):
+    cg.add_library("SPI", None)
+    cg.add_library("Wire", None)
+    cg.add_library("adafruit/Adafruit BusIO", None)
+    cg.add_library("adafruit/Adafruit GFX Library", None)
+    cg.add_library("zinggjm/GxEPD2", None)
+
     var = cg.new_Pvariable(config[CONF_ID])
 
     await display.register_display(var, config)
@@ -54,8 +71,3 @@ async def to_code(config):
     cg.add(var.set_busy_pin(busy))
     cg.add(var.set_clk_pin(clk))
     cg.add(var.set_mosi_pin(mosi))
-
-    if CORE.is_esp32 and CORE.using_arduino:
-        cg.add_library("SPI", None)
-
-    cg.add_library("zinggjm/GxEPD2", None)

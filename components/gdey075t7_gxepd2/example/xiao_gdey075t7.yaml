@@ -7,7 +7,7 @@ esphome:
 external_components:
   - source:
       type: local
-      path: ../components
+      path: ../..
     components: [ gdey075t7_gxepd2 ]
 
 esp32:
