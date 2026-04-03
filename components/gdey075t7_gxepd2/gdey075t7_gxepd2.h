@@ -11,7 +11,7 @@
 namespace esphome {
 namespace gdey075t7_gxepd2 {
 
-class GDEY075T7GxEPD2 : public PollingComponent, public display::DisplayBuffer {
+class GDEY075T7GxEPD2 : public display::DisplayBuffer {
  public:
   void set_cs_pin(InternalGPIOPin *pin) { this->cs_pin_ = pin; }
   void set_dc_pin(InternalGPIOPin *pin) { this->dc_pin_ = pin; }
@@ -39,7 +39,6 @@ class GDEY075T7GxEPD2 : public PollingComponent, public display::DisplayBuffer {
   void draw_absolute_pixel_internal(int x, int y, Color color) override;
 
   void flush_to_panel_();
-  bool get_pixel_(int x, int y) const;
 
   InternalGPIOPin *cs_pin_{nullptr};
   InternalGPIOPin *dc_pin_{nullptr};

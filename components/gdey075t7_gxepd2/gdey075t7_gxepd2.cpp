@@ -62,16 +62,6 @@ void GDEY075T7GxEPD2::update() {
   this->flush_to_panel_();
 }
 
-bool GDEY075T7GxEPD2::get_pixel_(int x, int y) const {
-  if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) {
-    return false;
-  }
-
-  const uint32_t pos = (x + y * WIDTH) / 8u;
-  const uint8_t bit = 0x80 >> (x & 0x07);
-  return (this->buffer_[pos] & bit) != 0;
-}
-
 void GDEY075T7GxEPD2::draw_absolute_pixel_internal(int x, int y, Color color) {
   if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) {
     return;
