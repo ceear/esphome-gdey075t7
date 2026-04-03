@@ -1,8 +1,5 @@
 esphome:
   name: xiao-gdey075t7-test
-  libraries:
-    - SPI
-    - zinggjm/GxEPD2
 
 external_components:
   - source:

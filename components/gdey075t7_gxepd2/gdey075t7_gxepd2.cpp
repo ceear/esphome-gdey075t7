@@ -74,8 +74,6 @@ void GDEY075T7GxEPD2::update() {
   this->epd_->setFullWindow();
   this->epd_->firstPage();
   do {
-    // Start each page with a white background, then let the lambda draw on top.
-    this->epd_->fillScreen(GxEPD_WHITE);
     this->do_update_();
   } while (this->epd_->nextPage());
 }
