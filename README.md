@@ -136,3 +136,37 @@ psram:
 ### Arduino framework
 
 This component relies on the Arduino SPI library and the GxEPD2 Arduino library. The ESP-IDF framework is **not** supported.
+
+---
+
+## Compatibility (verified 2026-04-03, ESPHome 2026.3.2)
+
+### ESPHome Display API vs native Waveshare integration
+
+| API feature | Waveshare (built-in) | GDEY075T7 |
+|---|---|---|
+| `DisplayBuffer` base class | ✅ | ✅ |
+| `draw_absolute_pixel_internal()` | ✅ | ✅ |
+| `fill()` — full screen | ✅ | ✅ via `epd_->fillScreen()` |
+| `fill()` — with active clipping region | ✅ | ✅ falls back to pixel-by-pixel |
+| `get_display_type()` → BINARY | ✅ | ✅ |
+| `rotation` | ✅ | ✅ handled by `DisplayBuffer::draw_pixel_at()` |
+| `lambda` | ✅ | ✅ |
+| `pages` + `on_page_change` automation | ✅ | ✅ |
+| `auto_clear_enabled` | ✅ | ✅ |
+| `show_test_card` | ✅ | ✅ |
+| `update_interval` | ✅ | ✅ |
+| `on_safe_shutdown()` → deep sleep | ✅ | ✅ via `epd_->hibernate()` |
+| `dump_config()` | ✅ | ✅ |
+
+### ESPHomeDesigner compatibility
+
+ESPHomeDesigner generates standard ESPHome display lambdas. All generated drawing primitives (`print`, `printf`, `image`, `qr_code`, `rectangle`, `line`, …) route through the standard `DisplayBuffer` interface and work identically to any native Waveshare display.
+
+### Architectural differences (not functional gaps)
+
+| Aspect | Waveshare (built-in) | GDEY075T7 |
+|---|---|---|
+| SPI layer | ESPHome `SPIDevice` (shared bus) | Arduino `SPI.begin()` (dedicated bus) |
+| Render pipeline | buffer → `write_array()` single pass | GxEPD2 paged; lambda called once per page |
+| Framework support | all ESPHome-supported boards | ESP32 + Arduino framework only |

@@ -8,9 +8,6 @@ static const char *const TAG = "gdey075t7_gxepd2";
 void GDEY075T7GxEPD2::setup() {
   ESP_LOGCONFIG(TAG, "Setting up GDEY075T7 GxEPD2 display");
 
-  // 1 bit per pixel
-  this->init_internal_(WIDTH * HEIGHT / 8);
-
   SPI.begin(
       this->clk_pin_->get_pin(),
       -1,
@@ -63,39 +60,30 @@ void GDEY075T7GxEPD2::on_safe_shutdown() {
   }
 }
 
+void GDEY075T7GxEPD2::fill(Color color) {
+  if (this->get_clipping().is_set()) {
+    Display::fill(color);
+    return;
+  }
+  if (this->epd_ == nullptr) return;
+  this->epd_->fillScreen(color.is_on() ? GxEPD_BLACK : GxEPD_WHITE);
+}
+
 void GDEY075T7GxEPD2::update() {
-  this->do_update_();
-  this->flush_to_panel_();
-}
-
-void GDEY075T7GxEPD2::draw_absolute_pixel_internal(int x, int y, Color color) {
-  if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) {
-    return;
-  }
-
-  const uint32_t pos = (x + y * WIDTH) / 8u;
-  const uint8_t bit = 0x80 >> (x & 0x07);
-
-  // color.is_on() => black pixel
-  if (color.is_on()) {
-    this->buffer_[pos] |= bit;
-  } else {
-    this->buffer_[pos] &= ~bit;
-  }
-}
-
-void GDEY075T7GxEPD2::flush_to_panel_() {
-  if (this->epd_ == nullptr) {
-    ESP_LOGE(TAG, "Display object not initialized");
-    return;
-  }
-
+  if (this->epd_ == nullptr) return;
   this->epd_->setFullWindow();
   this->epd_->firstPage();
   do {
-    this->epd_->drawBitmap(0, 0, (const uint8_t *) this->buffer_, WIDTH, HEIGHT,
-                            GxEPD_BLACK, GxEPD_WHITE);
+    // Start each page with a white background, then let the lambda draw on top.
+    this->epd_->fillScreen(GxEPD_WHITE);
+    this->do_update_();
   } while (this->epd_->nextPage());
+}
+
+void GDEY075T7GxEPD2::draw_absolute_pixel_internal(int x, int y, Color color) {
+  if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return;
+  if (this->epd_ == nullptr) return;
+  this->epd_->drawPixel(x, y, color.is_on() ? GxEPD_BLACK : GxEPD_WHITE);
 }
 
 }  // namespace gdey075t7_gxepd2

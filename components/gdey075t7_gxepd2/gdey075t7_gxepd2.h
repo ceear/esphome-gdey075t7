@@ -24,6 +24,7 @@ class GDEY075T7GxEPD2 : public display::DisplayBuffer {
   void update() override;
   void dump_config() override;
   void on_safe_shutdown() override;
+  void fill(Color color) override;
 
   float get_setup_priority() const override { return setup_priority::PROCESSOR; }
 
@@ -38,8 +39,6 @@ class GDEY075T7GxEPD2 : public display::DisplayBuffer {
   int get_width_internal() override { return WIDTH; }
   int get_height_internal() override { return HEIGHT; }
   void draw_absolute_pixel_internal(int x, int y, Color color) override;
-
-  void flush_to_panel_();
 
   InternalGPIOPin *cs_pin_{nullptr};
   InternalGPIOPin *dc_pin_{nullptr};
