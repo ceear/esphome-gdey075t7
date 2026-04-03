@@ -1,0 +1,53 @@
+esphome:
+  name: xiao-gdey075t7-test
+  libraries:
+    - SPI
+    - zinggjm/GxEPD2
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [ gdey075t7_gxepd2 ]
+
+esp32:
+  board: seeed_xiao_esp32s3
+  framework:
+    type: arduino
+
+psram:
+  mode: octal
+
+logger:
+  level: DEBUG
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+font:
+  - file: "gfonts://Roboto"
+    id: font_hello
+    size: 36
+
+display:
+  - platform: gdey075t7_gxepd2
+    id: epd
+    cs_pin: GPIO2
+    dc_pin: GPIO4
+    reset_pin: GPIO1
+    busy_pin: GPIO3
+    clk_pin: GPIO7
+    mosi_pin: GPIO9
+    update_interval: 120s
+    lambda: |-
+      it.fill(COLOR_OFF);
+      it.printf(20, 60, id(font_hello), COLOR_ON, "Hello World");
+      it.rectangle(10, 10, 780, 460);
+      it.line(10, 10, 790, 470);
+      it.line(790, 10, 10, 470);
