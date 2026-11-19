@@ -1,5 +1,7 @@
 #include "gdey075t7_gxepd2.h"
 
+#include <esp_sleep.h>
+
 namespace esphome {
 namespace gdey075t7_gxepd2 {
 
@@ -24,7 +26,15 @@ void GDEY075T7GxEPD2::setup() {
 
   this->epd_->init(0, true, 2, false);
 
-  // Initial blank frame so the panel starts in a known state.
+  // Waking from deep sleep: the panel still shows the last image. Skip the
+  // blank frame so the old image stays visible until the next update() replaces
+  // it in a single full refresh (avoids a visible white phase and one refresh).
+  if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_UNDEFINED) {
+    ESP_LOGD(TAG, "Woke from deep sleep - keeping previous image");
+    return;
+  }
+
+  // Cold boot: initial blank frame so the panel starts in a known state.
   this->epd_->firstPage();
   do {
     this->epd_->fillScreen(GxEPD_WHITE);

@@ -124,6 +124,8 @@ All standard ESPHome drawing primitives (`print`, `printf`, `rectangle`, `line`,
 
 A full refresh takes roughly 3–5 seconds. During refresh, the display cycles through black and white flashes — this is normal for e-ink. A minimum `update_interval` of `60s` is recommended to avoid excessive wear on the panel.
 
+On a cold boot (power-on, reset, flashing) the component clears the panel to white once during `setup()`. When the ESP32 wakes from deep sleep, this blank frame is skipped: the previous image stays visible until the first `update()` replaces it in a single refresh.
+
 ### PSRAM
 
 The XIAO ESP32S3 has 8 MB octal PSRAM. Enable it to ensure there is enough heap for the display buffer (38 400 bytes) and other components:
@@ -157,6 +159,7 @@ This component relies on the Arduino SPI library and the GxEPD2 Arduino library.
 | `show_test_card` | ✅ | ✅ |
 | `update_interval` | ✅ | ✅ |
 | `on_safe_shutdown()` → deep sleep | ✅ | ✅ via `epd_->hibernate()` |
+| Wake from deep sleep without blank frame | — | ✅ previous image kept until first `update()` |
 | `dump_config()` | ✅ | ✅ |
 
 ### ESPHomeDesigner compatibility
