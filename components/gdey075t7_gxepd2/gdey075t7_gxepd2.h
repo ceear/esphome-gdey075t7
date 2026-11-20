@@ -32,6 +32,12 @@ class GDEY075T7GxEPD2 : public display::DisplayBuffer {
   void set_busy_pin(InternalGPIOPin *pin) { this->busy_pin_ = pin; }
   void set_clk_pin(InternalGPIOPin *pin) { this->clk_pin_ = pin; }
   void set_mosi_pin(InternalGPIOPin *pin) { this->mosi_pin_ = pin; }
+  // Greyscale mode only: map 1/3-covered edge pixels to white (slimmer text).
+  void set_light_edges(bool light) {
+#ifdef USE_GDEY075T7_GRAYSCALE
+    this->light_edges_ = light;
+#endif
+  }
 
   void setup() override;
   void update() override;
@@ -68,10 +74,14 @@ class GDEY075T7GxEPD2 : public display::DisplayBuffer {
   // ESPHome colour -> grey value for GxEPD2_4G (0 = black, 255 = white).
   // COLOR_ON means ink, so more colour means darker; anti-aliased font pixels
   // arrive as gradients between background and foreground.
-  static uint8_t to_grey_(Color color) {
-    uint8_t ink = std::max(std::max(color.r, color.g), std::max(color.b, color.w));
-    return 255 - ink;
+  uint8_t to_grey_(Color color) const {
+    const uint8_t ink = std::max(std::max(color.r, color.g), std::max(color.b, color.w));
+    const uint8_t level = (ink * 3 + 127) / 255;  // 0 = white .. 3 = black
+    static const uint8_t NORMAL[4] = {255, 170, 85, 0};
+    static const uint8_t LIGHT[4] = {255, 255, 170, 0};
+    return (this->light_edges_ ? LIGHT : NORMAL)[level];
   }
+  bool light_edges_{false};
 #endif
 
   GDEY075T7Epd *epd_{nullptr};

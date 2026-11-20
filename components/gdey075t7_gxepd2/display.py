@@ -16,6 +16,7 @@ CONF_BUSY_PIN = "busy_pin"
 CONF_CLK_PIN = "clk_pin"
 CONF_MOSI_PIN = "mosi_pin"
 CONF_GRAYSCALE = "grayscale"
+CONF_GRAYSCALE_EDGES = "grayscale_edges"
 
 # 4-level greyscale needs ZinggJM/GxEPD2_4G (not in the PlatformIO registry, pinned commit)
 GXEPD2_4G_REPO = "https://github.com/ZinggJM/GxEPD2_4G.git#de006169dba1d905f618d70423f0e1a9215b20c7"
@@ -47,6 +48,10 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_CLK_PIN): pins.internal_gpio_output_pin_schema,
             cv.Required(CONF_MOSI_PIN): pins.internal_gpio_output_pin_schema,
             cv.Optional(CONF_GRAYSCALE, default=False): cv.boolean,
+            # How anti-aliased edge pixels map to the 4 levels:
+            #   normal: 1/3 -> light grey, 2/3 -> dark grey   (smoothest, looks bolder on the panel)
+            #   light:  1/3 -> white,      2/3 -> light grey  (slimmer strokes, still smooth)
+            cv.Optional(CONF_GRAYSCALE_EDGES, default="normal"): cv.one_of("normal", "light", lower=True),
         }
     ).extend(cv.polling_component_schema("60s")),
     _validate_arduino,
@@ -65,6 +70,8 @@ async def to_code(config):
         cg.add_library("zinggjm/GxEPD2", None)
 
     var = cg.new_Pvariable(config[CONF_ID])
+    if config[CONF_GRAYSCALE] and config[CONF_GRAYSCALE_EDGES] == "light":
+        cg.add(var.set_light_edges(True))
 
     await display.register_display(var, config)
 

@@ -44,7 +44,7 @@ void GDEY075T7GxEPD2::setup() {
 void GDEY075T7GxEPD2::dump_config() {
   ESP_LOGCONFIG(TAG, "GDEY075T7 GxEPD2 Display");
 #ifdef USE_GDEY075T7_GRAYSCALE
-  ESP_LOGCONFIG(TAG, "  Mode: 4-level greyscale (GxEPD2_4G)");
+  ESP_LOGCONFIG(TAG, "  Mode: 4-level greyscale (GxEPD2_4G), edges: %s", this->light_edges_ ? "light" : "normal");
 #else
   ESP_LOGCONFIG(TAG, "  Mode: black/white");
 #endif
