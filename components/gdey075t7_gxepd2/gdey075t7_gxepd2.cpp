@@ -1,6 +1,7 @@
 #include "gdey075t7_gxepd2.h"
 
 #include <esp_sleep.h>
+#include "esphome/core/application.h"
 
 namespace esphome {
 namespace gdey075t7_gxepd2 {
@@ -17,12 +18,19 @@ void GDEY075T7GxEPD2::setup() {
       this->cs_pin_->get_pin());
 
   this->epd_ =
-      new GxEPD2_BW<GxEPD2_750_GDEY075T7, GxEPD2_750_GDEY075T7::HEIGHT / 2>(
+      new GDEY075T7Epd(
           GxEPD2_750_GDEY075T7(
               this->cs_pin_->get_pin(),
               this->dc_pin_->get_pin(),
               this->reset_pin_->get_pin(),
               this->busy_pin_->get_pin()));
+
+  // Long panel refreshes block the main loop: keep the task watchdog fed while
+  // the driver waits for BUSY (a stuck panel must not reset-loop the ESP).
+  this->epd_->epd2.setBusyCallback([](const void *) {
+    App.feed_wdt();
+    delay(1);
+  });
 
   this->epd_->init(0, true, 2, false);
 
@@ -43,6 +51,11 @@ void GDEY075T7GxEPD2::setup() {
 
 void GDEY075T7GxEPD2::dump_config() {
   ESP_LOGCONFIG(TAG, "GDEY075T7 GxEPD2 Display");
+#ifdef USE_GDEY075T7_GRAYSCALE
+  ESP_LOGCONFIG(TAG, "  Mode: 4-level greyscale (GxEPD2_4G), edges: %s", this->light_edges_ ? "light" : "normal");
+#else
+  ESP_LOGCONFIG(TAG, "  Mode: black/white");
+#endif
   LOG_UPDATE_INTERVAL(this);
   if (this->cs_pin_ != nullptr) {
     ESP_LOGCONFIG(TAG, "  CS pin: GPIO%d", this->cs_pin_->get_pin());
@@ -76,22 +89,33 @@ void GDEY075T7GxEPD2::fill(Color color) {
     return;
   }
   if (this->epd_ == nullptr) return;
+#ifdef USE_GDEY075T7_GRAYSCALE
+  static const uint16_t LEVELS[4] = {GxEPD_BLACK, GxEPD_DARKGREY, GxEPD_LIGHTGREY, GxEPD_WHITE};
+  this->epd_->fillScreen(LEVELS[to_grey_(color) >> 6]);
+#else
   this->epd_->fillScreen(color.is_on() ? GxEPD_BLACK : GxEPD_WHITE);
+#endif
 }
 
 void GDEY075T7GxEPD2::update() {
   if (this->epd_ == nullptr) return;
+  const uint32_t start = millis();
   this->epd_->setFullWindow();
   this->epd_->firstPage();
   do {
     this->do_update_();
   } while (this->epd_->nextPage());
+  ESP_LOGD(TAG, "update: %u ms", (unsigned) (millis() - start));
 }
 
 void GDEY075T7GxEPD2::draw_absolute_pixel_internal(int x, int y, Color color) {
   if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return;
   if (this->epd_ == nullptr) return;
+#ifdef USE_GDEY075T7_GRAYSCALE
+  this->epd_->drawGreyPixel(x, y, to_grey_(color));
+#else
   this->epd_->drawPixel(x, y, color.is_on() ? GxEPD_BLACK : GxEPD_WHITE);
+#endif
 }
 
 }  // namespace gdey075t7_gxepd2

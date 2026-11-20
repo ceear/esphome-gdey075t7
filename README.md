@@ -120,6 +120,28 @@ This is a binary (monochrome) display:
 
 All standard ESPHome drawing primitives (`print`, `printf`, `rectangle`, `line`, `filled_rectangle`, `image`, …) work as usual.
 
+### Greyscale mode (optional)
+
+```yaml
+display:
+  - platform: gdey075t7_gxepd2
+    grayscale: true
+    grayscale_edges: normal   # or: light (slimmer text)
+    # ...
+font:
+  - file: "gfonts://Roboto"
+    size: 17
+    bpp: 2          # anti-aliased glyphs -> 4 grey levels on the panel
+```
+
+With `grayscale: true` the component uses [GxEPD2_4G](https://github.com/ZinggJM/GxEPD2_4G) instead of GxEPD2 and reports itself as a greyscale display. Colours are mapped to 4 levels (white, light grey, dark grey, black) by their brightness, so anti-aliased fonts (`bpp: 2`) get smooth edges. Text and layout geometry are unchanged.
+
+`grayscale_edges` controls how partially covered edge pixels are drawn: `normal` maps 1/3 and 2/3 coverage to light and dark grey (smoothest), `light` maps 1/3 to white and 2/3 to light grey — strokes look slimmer while curves stay smooth. Grey levels tend to look darker on the panel than on a monitor.
+
+Tip: TrueType fonts with their own hinting (e.g. Roboto from Google Fonts) are only hinted vertically when anti-aliased, so vertical stems can land between pixels and some letters look thinner than others. A copy of the font with the hinting instructions removed makes FreeType use its auto-hinter, which snaps all stems to whole pixels.
+
+Trade-offs: every update is a greyscale full refresh (≈2.5 s instead of ≈1.2 s), the frame buffer doubles, and fonts with `bpp: 2` need twice the flash. For white text on a black area pass the background colour, e.g. `it.printf(x, y, font, COLOR_OFF, COLOR_ON, TextAlign::TOP_LEFT, "…")`, otherwise anti-aliased edges are blended against white.
+
 ### Refresh speed
 
 A full refresh takes roughly 3–5 seconds. During refresh, the display cycles through black and white flashes — this is normal for e-ink. A minimum `update_interval` of `60s` is recommended to avoid excessive wear on the panel.
@@ -151,7 +173,7 @@ This component relies on the Arduino SPI library and the GxEPD2 Arduino library.
 | `draw_absolute_pixel_internal()` | ✅ | ✅ |
 | `fill()` — full screen | ✅ | ✅ via `epd_->fillScreen()` |
 | `fill()` — with active clipping region | ✅ | ✅ falls back to pixel-by-pixel |
-| `get_display_type()` → BINARY | ✅ | ✅ |
+| `get_display_type()` → BINARY | ✅ | ✅ (GRAYSCALE with `grayscale: true`) |
 | `rotation` | ✅ | ✅ handled by `DisplayBuffer::draw_pixel_at()` |
 | `lambda` | ✅ | ✅ |
 | `pages` + `on_page_change` automation | ✅ | ✅ |
