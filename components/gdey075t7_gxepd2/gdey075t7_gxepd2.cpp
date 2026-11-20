@@ -1,9 +1,12 @@
 #include "gdey075t7_gxepd2.h"
 
 #include <esp_sleep.h>
+#include "esphome/core/application.h"
 
 namespace esphome {
 namespace gdey075t7_gxepd2 {
+
+static const char *const TAG = "gdey075t7_gxepd2";
 
 #ifdef USE_GDEY075T7_GRAYSCALE
 uint8_t GDEY075T7Panel4G::white_boost_frames = 0;
@@ -58,39 +61,58 @@ void GDEY075T7Panel4G::write_lut_(uint8_t cmd, uint8_t level, uint8_t drive, uin
 // Controller RAM (written by writeImage_4G): white (1,1), black (0,0),
 // light grey (old 0, new 1), dark grey (old 1, new 0) — see to_grey_().
 void GDEY075T7Panel4G::two_pass_refresh_() {
+  const uint32_t t0 = millis();
+  // The controller selects/loads the waveform at power-on: power-cycle the
+  // panel supply around each pass (otherwise BUSY never releases).
+  auto power_off = [this]() {
+    if (this->_power_is_on) {
+      this->_writeCommand(0x02);
+      this->_waitWhileBusy("two_pass power off", 42);
+      this->_power_is_on = false;
+    }
+  };
+  auto power_on = [this]() {
+    this->_writeCommand(0x04);
+    this->_waitWhileBusy("two_pass power on", 140);
+    this->_power_is_on = true;
+  };
+  power_off();
   // Pass 1: factory OTP waveform (fast full update) -> every pixel becomes its
   // "new" colour: white/light grey -> white, black/dark grey -> black.
   this->_writeCommand(0x00);  // panel setting: KW, LUT from OTP
   this->_writeData(0x1f);
-  this->_writeCommand(0x50);  // VCOM/data interval: LUTBD, no N2OCP (keep old plane!)
-  this->_writeData(0x31);
+  this->_writeCommand(0x50);  // VCOM/data interval: border as in b/w mode (0x29) but
+  this->_writeData(0x21);     // without N2OCP — the old plane is needed for pass 2
   this->_writeData(0x07);
   this->_writeCommand(0xE0);  // cascade setting: TSFIX
   this->_writeData(0x02);
   this->_writeCommand(0xE5);  // force temperature 90 -> fast full update
   this->_writeData(0x5A);
-  if (!this->_power_is_on) {
-    this->_writeCommand(0x04);
-    this->_waitWhileBusy("two_pass power on", 140);
-    this->_power_is_on = true;
-  }
+  power_on();
   this->_writeCommand(0x12);
   this->_waitWhileBusy("two_pass OTP", 1200);
+  const uint32_t t1 = millis();
 
   // Pass 2: register LUTs, only grey pixels are driven.
   const uint8_t total = std::max(light_frames, dark_frames);
+  power_off();
   this->_writeCommand(0xE0);  // back to internal temperature
   this->_writeData(0x00);
   this->_writeCommand(0x00);  // panel setting: KW, LUT from registers
   this->_writeData(0x3f);
+  this->_writeCommand(0x50);  // border from LUTBD (as in GxEPD2_4G), no N2OCP
+  this->_writeData(0x31);
+  this->_writeData(0x07);
   this->write_lut_(0x20, 0x00, total, total);         // VCOM: DC level
   this->write_lut_(0x21, 0x00, total, total);         // white: no drive
   this->write_lut_(0x22, 0x40, light_frames, total);  // old 0/new 1 = light grey: black pulse
   this->write_lut_(0x23, 0x80, dark_frames, total);   // old 1/new 0 = dark grey: white pulse
   this->write_lut_(0x24, 0x00, total, total);         // black: no drive
   this->write_lut_(0x25, 0x00, total, total);         // border: no drive
+  power_on();
   this->_writeCommand(0x12);
   this->_waitWhileBusy("two_pass grey", 500);
+  ESP_LOGD(TAG, "two-pass refresh: OTP %u ms, grey %u ms", (unsigned) (t1 - t0), (unsigned) (millis() - t1));
 }
 
 void GDEY075T7Panel4G::refresh(bool partial_update_mode) {
@@ -105,7 +127,6 @@ void GDEY075T7Panel4G::refresh(bool partial_update_mode) {
 }
 #endif
 
-static const char *const TAG = "gdey075t7_gxepd2";
 
 void GDEY075T7GxEPD2::setup() {
   ESP_LOGCONFIG(TAG, "Setting up GDEY075T7 GxEPD2 display");
@@ -127,6 +148,13 @@ void GDEY075T7GxEPD2::setup() {
               this->dc_pin_->get_pin(),
               this->reset_pin_->get_pin(),
               this->busy_pin_->get_pin()));
+
+  // Long panel refreshes block the main loop: keep the task watchdog fed while
+  // the driver waits for BUSY (otherwise a slow refresh resets the ESP).
+  this->epd_->epd2.setBusyCallback([](const void *) {
+    App.feed_wdt();
+    delay(1);
+  });
 
   this->epd_->init(0, true, 2, false);
 
@@ -199,11 +227,13 @@ void GDEY075T7GxEPD2::fill(Color color) {
 
 void GDEY075T7GxEPD2::update() {
   if (this->epd_ == nullptr) return;
+  const uint32_t start = millis();
   this->epd_->setFullWindow();
   this->epd_->firstPage();
   do {
     this->do_update_();
   } while (this->epd_->nextPage());
+  ESP_LOGD(TAG, "update: %u ms", (unsigned) (millis() - start));
 }
 
 void GDEY075T7GxEPD2::draw_absolute_pixel_internal(int x, int y, Color color) {
