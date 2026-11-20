@@ -18,6 +18,9 @@ CONF_MOSI_PIN = "mosi_pin"
 CONF_GRAYSCALE = "grayscale"
 CONF_GRAYSCALE_EDGES = "grayscale_edges"
 CONF_GRAYSCALE_WHITE_BOOST = "grayscale_white_boost"
+CONF_GRAYSCALE_REFRESH = "grayscale_refresh"
+CONF_GRAYSCALE_LIGHT_FRAMES = "grayscale_light_frames"
+CONF_GRAYSCALE_DARK_FRAMES = "grayscale_dark_frames"
 
 # 4-level greyscale needs ZinggJM/GxEPD2_4G (not in the PlatformIO registry, pinned commit)
 GXEPD2_4G_REPO = "https://github.com/ZinggJM/GxEPD2_4G.git#de006169dba1d905f618d70423f0e1a9215b20c7"
@@ -57,6 +60,14 @@ CONFIG_SCHEMA = cv.All(
             # waveform that drive only white pixels (and the border) to white again.
             # Counters the grey veil of the GxEPD2_4G waveform. 0 = library waveform.
             cv.Optional(CONF_GRAYSCALE_WHITE_BOOST, default=0): cv.int_range(min=0, max=255),
+            # lut:      GxEPD2_4G greyscale waveform (one pass)
+            # two_pass: factory (OTP) black/white refresh first -> clean white and
+            #           black, then a short register-LUT pass that only nudges the
+            #           grey pixels (light: black pulse from white, dark: white pulse
+            #           from black). Pulse lengths in frames (~20 ms each).
+            cv.Optional(CONF_GRAYSCALE_REFRESH, default="lut"): cv.one_of("lut", "two_pass", lower=True),
+            cv.Optional(CONF_GRAYSCALE_LIGHT_FRAMES, default=4): cv.int_range(min=1, max=100),
+            cv.Optional(CONF_GRAYSCALE_DARK_FRAMES, default=5): cv.int_range(min=1, max=100),
         }
     ).extend(cv.polling_component_schema("60s")),
     _validate_arduino,
@@ -79,6 +90,8 @@ async def to_code(config):
         cg.add(var.set_light_edges(True))
     if config[CONF_GRAYSCALE] and config[CONF_GRAYSCALE_WHITE_BOOST] > 0:
         cg.add(var.set_white_boost(config[CONF_GRAYSCALE_WHITE_BOOST]))
+    if config[CONF_GRAYSCALE] and config[CONF_GRAYSCALE_REFRESH] == "two_pass":
+        cg.add(var.set_two_pass(config[CONF_GRAYSCALE_LIGHT_FRAMES], config[CONF_GRAYSCALE_DARK_FRAMES]))
 
     await display.register_display(var, config)
 

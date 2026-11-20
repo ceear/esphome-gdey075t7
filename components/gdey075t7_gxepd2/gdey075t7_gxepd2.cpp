@@ -43,7 +43,61 @@ void GDEY075T7Panel4G::write_boost_luts_() {
   }
 }
 
+bool GDEY075T7Panel4G::two_pass = false;
+uint8_t GDEY075T7Panel4G::light_frames = 4;
+uint8_t GDEY075T7Panel4G::dark_frames = 5;
+
+// One LUT row: `level` for `drive` frames, then GND until `total`; rest zero.
+void GDEY075T7Panel4G::write_lut_(uint8_t cmd, uint8_t level, uint8_t drive, uint8_t total) {
+  this->_writeCommand(cmd);
+  const uint8_t row[6] = {level, drive, (uint8_t) (total - drive), 0x00, 0x00, 0x01};
+  for (uint8_t b : row) this->_writeData(b);
+  for (int i = 6; i < 42; i++) this->_writeData(0x00);
+}
+
+// Controller RAM (written by writeImage_4G): white (1,1), black (0,0),
+// light grey (old 0, new 1), dark grey (old 1, new 0) — see to_grey_().
+void GDEY075T7Panel4G::two_pass_refresh_() {
+  // Pass 1: factory OTP waveform (fast full update) -> every pixel becomes its
+  // "new" colour: white/light grey -> white, black/dark grey -> black.
+  this->_writeCommand(0x00);  // panel setting: KW, LUT from OTP
+  this->_writeData(0x1f);
+  this->_writeCommand(0x50);  // VCOM/data interval: LUTBD, no N2OCP (keep old plane!)
+  this->_writeData(0x31);
+  this->_writeData(0x07);
+  this->_writeCommand(0xE0);  // cascade setting: TSFIX
+  this->_writeData(0x02);
+  this->_writeCommand(0xE5);  // force temperature 90 -> fast full update
+  this->_writeData(0x5A);
+  if (!this->_power_is_on) {
+    this->_writeCommand(0x04);
+    this->_waitWhileBusy("two_pass power on", 140);
+    this->_power_is_on = true;
+  }
+  this->_writeCommand(0x12);
+  this->_waitWhileBusy("two_pass OTP", 1200);
+
+  // Pass 2: register LUTs, only grey pixels are driven.
+  const uint8_t total = std::max(light_frames, dark_frames);
+  this->_writeCommand(0xE0);  // back to internal temperature
+  this->_writeData(0x00);
+  this->_writeCommand(0x00);  // panel setting: KW, LUT from registers
+  this->_writeData(0x3f);
+  this->write_lut_(0x20, 0x00, total, total);         // VCOM: DC level
+  this->write_lut_(0x21, 0x00, total, total);         // white: no drive
+  this->write_lut_(0x22, 0x40, light_frames, total);  // old 0/new 1 = light grey: black pulse
+  this->write_lut_(0x23, 0x80, dark_frames, total);   // old 1/new 0 = dark grey: white pulse
+  this->write_lut_(0x24, 0x00, total, total);         // black: no drive
+  this->write_lut_(0x25, 0x00, total, total);         // border: no drive
+  this->_writeCommand(0x12);
+  this->_waitWhileBusy("two_pass grey", 500);
+}
+
 void GDEY075T7Panel4G::refresh(bool partial_update_mode) {
+  if (!partial_update_mode && two_pass) {
+    this->two_pass_refresh_();
+    return;
+  }
   // Only relevant for the register-LUT (greyscale) refresh; in OTP mode the
   // controller ignores the LUT registers, so writing them is harmless.
   if (!partial_update_mode && white_boost_frames > 0) this->write_boost_luts_();
@@ -96,6 +150,9 @@ void GDEY075T7GxEPD2::dump_config() {
 #ifdef USE_GDEY075T7_GRAYSCALE
   ESP_LOGCONFIG(TAG, "  Mode: 4-level greyscale (GxEPD2_4G), edges: %s, white boost: %u frames",
                 this->light_edges_ ? "light" : "normal", (unsigned) GDEY075T7Panel4G::white_boost_frames);
+  if (GDEY075T7Panel4G::two_pass)
+    ESP_LOGCONFIG(TAG, "  Refresh: two-pass (OTP b/w + grey pulses light %u / dark %u frames)",
+                  (unsigned) GDEY075T7Panel4G::light_frames, (unsigned) GDEY075T7Panel4G::dark_frames);
 #else
   ESP_LOGCONFIG(TAG, "  Mode: black/white");
 #endif
