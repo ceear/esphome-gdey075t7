@@ -18,8 +18,23 @@ namespace esphome {
 namespace gdey075t7_gxepd2 {
 
 #ifdef USE_GDEY075T7_GRAYSCALE
+// Panel class of GxEPD2_4G with an optional "white boost": before every full
+// refresh the greyscale LUTs are rewritten with one extra phase in which only
+// white pixels (and the border) are driven to white again. The library LUTs end
+// with a slightly grey white on this panel.
+class GDEY075T7Panel4G : public GxEPD2_750_GDEY075T7 {
+ public:
+  using GxEPD2_750_GDEY075T7::GxEPD2_750_GDEY075T7;
+  using GxEPD2_750_GDEY075T7::refresh;
+  void refresh(bool partial_update_mode = false) override;
+  static uint8_t white_boost_frames;  // 0 = unchanged library waveform
+
+ protected:
+  void write_boost_luts_();
+};
+
 // 4 grey levels (2 bit per pixel); full refresh uses the greyscale waveform.
-using GDEY075T7Epd = GxEPD2_4G_4G<GxEPD2_750_GDEY075T7, GxEPD2_750_GDEY075T7::HEIGHT / 2>;
+using GDEY075T7Epd = GxEPD2_4G_4G<GDEY075T7Panel4G, GDEY075T7Panel4G::HEIGHT / 2>;
 #else
 using GDEY075T7Epd = GxEPD2_BW<GxEPD2_750_GDEY075T7, GxEPD2_750_GDEY075T7::HEIGHT / 2>;
 #endif
@@ -32,6 +47,12 @@ class GDEY075T7GxEPD2 : public display::DisplayBuffer {
   void set_busy_pin(InternalGPIOPin *pin) { this->busy_pin_ = pin; }
   void set_clk_pin(InternalGPIOPin *pin) { this->clk_pin_ = pin; }
   void set_mosi_pin(InternalGPIOPin *pin) { this->mosi_pin_ = pin; }
+  // Greyscale mode only: extra white drive frames at the end of the waveform.
+  void set_white_boost(uint8_t frames) {
+#ifdef USE_GDEY075T7_GRAYSCALE
+    GDEY075T7Panel4G::white_boost_frames = frames;
+#endif
+  }
   // Greyscale mode only: map 1/3-covered edge pixels to white (slimmer text).
   void set_light_edges(bool light) {
 #ifdef USE_GDEY075T7_GRAYSCALE

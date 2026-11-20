@@ -5,6 +5,52 @@
 namespace esphome {
 namespace gdey075t7_gxepd2 {
 
+#ifdef USE_GDEY075T7_GRAYSCALE
+uint8_t GDEY075T7Panel4G::white_boost_frames = 0;
+
+// Copy of the GxEPD2_4G greyscale LUTs for GDEY075T7 (UC8179), rows of
+// {levels A|B|C|D (2 bit each: 00 GND, 01 to black, 10 to white), frames A..D, repeat}.
+// Row 5 is the added white boost (frames filled in at runtime).
+static uint8_t lut_vcom[42] = {
+    0x00, 0x0A, 0x00, 0x00, 0x00, 0x01, 0x60, 0x14, 0x14, 0x00, 0x00, 0x01,
+    0x00, 0x14, 0x0A, 0x00, 0x00, 0x01, 0x00, 0x13, 0x0A, 0x01, 0x00, 0x01,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+static uint8_t lut_ww[42] = {  // white -> white (also used for the border)
+    0x40, 0x0A, 0x00, 0x00, 0x00, 0x01, 0x90, 0x14, 0x14, 0x00, 0x00, 0x01,
+    0x10, 0x14, 0x0A, 0x00, 0x00, 0x01, 0xA0, 0x13, 0x0A, 0x00, 0x00, 0x01,
+    0x80, 0x00, 0x00, 0x00, 0x00, 0x01};
+static uint8_t lut_bw[42] = {  // light grey
+    0x40, 0x0A, 0x00, 0x00, 0x00, 0x01, 0x90, 0x14, 0x14, 0x00, 0x00, 0x01,
+    0x00, 0x14, 0x0A, 0x00, 0x00, 0x01, 0x99, 0x0C, 0x01, 0x03, 0x04, 0x01,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+static uint8_t lut_wb[42] = {  // dark grey
+    0x40, 0x0A, 0x00, 0x00, 0x00, 0x01, 0x90, 0x14, 0x14, 0x00, 0x00, 0x01,
+    0x00, 0x14, 0x0A, 0x00, 0x00, 0x01, 0x99, 0x0B, 0x04, 0x04, 0x01, 0x01,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+static uint8_t lut_bb[42] = {  // black
+    0x80, 0x0A, 0x00, 0x00, 0x00, 0x01, 0x90, 0x14, 0x14, 0x00, 0x00, 0x01,
+    0x20, 0x14, 0x0A, 0x00, 0x00, 0x01, 0x50, 0x13, 0x01, 0x00, 0x00, 0x01,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+
+void GDEY075T7Panel4G::write_boost_luts_() {
+  uint8_t *luts[] = {lut_vcom, lut_ww, lut_bw, lut_wb, lut_bb};
+  for (uint8_t *l : luts) l[25] = white_boost_frames;  // row 5, phase A: same length in every LUT
+  const uint8_t cmds[] = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25};
+  uint8_t *data[] = {lut_vcom, lut_ww, lut_bw, lut_wb, lut_bb, lut_ww};
+  for (int i = 0; i < 6; i++) {
+    this->_writeCommand(cmds[i]);
+    for (int j = 0; j < 42; j++) this->_writeData(data[i][j]);
+  }
+}
+
+void GDEY075T7Panel4G::refresh(bool partial_update_mode) {
+  // Only relevant for the register-LUT (greyscale) refresh; in OTP mode the
+  // controller ignores the LUT registers, so writing them is harmless.
+  if (!partial_update_mode && white_boost_frames > 0) this->write_boost_luts_();
+  GxEPD2_750_GDEY075T7::refresh(partial_update_mode);
+}
+#endif
+
 static const char *const TAG = "gdey075t7_gxepd2";
 
 void GDEY075T7GxEPD2::setup() {
@@ -18,7 +64,11 @@ void GDEY075T7GxEPD2::setup() {
 
   this->epd_ =
       new GDEY075T7Epd(
+#ifdef USE_GDEY075T7_GRAYSCALE
+          GDEY075T7Panel4G(
+#else
           GxEPD2_750_GDEY075T7(
+#endif
               this->cs_pin_->get_pin(),
               this->dc_pin_->get_pin(),
               this->reset_pin_->get_pin(),
@@ -44,7 +94,8 @@ void GDEY075T7GxEPD2::setup() {
 void GDEY075T7GxEPD2::dump_config() {
   ESP_LOGCONFIG(TAG, "GDEY075T7 GxEPD2 Display");
 #ifdef USE_GDEY075T7_GRAYSCALE
-  ESP_LOGCONFIG(TAG, "  Mode: 4-level greyscale (GxEPD2_4G), edges: %s", this->light_edges_ ? "light" : "normal");
+  ESP_LOGCONFIG(TAG, "  Mode: 4-level greyscale (GxEPD2_4G), edges: %s, white boost: %u frames",
+                this->light_edges_ ? "light" : "normal", (unsigned) GDEY075T7Panel4G::white_boost_frames);
 #else
   ESP_LOGCONFIG(TAG, "  Mode: black/white");
 #endif

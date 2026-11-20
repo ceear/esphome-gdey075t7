@@ -17,6 +17,7 @@ CONF_CLK_PIN = "clk_pin"
 CONF_MOSI_PIN = "mosi_pin"
 CONF_GRAYSCALE = "grayscale"
 CONF_GRAYSCALE_EDGES = "grayscale_edges"
+CONF_GRAYSCALE_WHITE_BOOST = "grayscale_white_boost"
 
 # 4-level greyscale needs ZinggJM/GxEPD2_4G (not in the PlatformIO registry, pinned commit)
 GXEPD2_4G_REPO = "https://github.com/ZinggJM/GxEPD2_4G.git#de006169dba1d905f618d70423f0e1a9215b20c7"
@@ -52,6 +53,10 @@ CONFIG_SCHEMA = cv.All(
             #   normal: 1/3 -> light grey, 2/3 -> dark grey   (smoothest, looks bolder on the panel)
             #   light:  1/3 -> white,      2/3 -> light grey  (slimmer strokes, still smooth)
             cv.Optional(CONF_GRAYSCALE_EDGES, default="normal"): cv.one_of("normal", "light", lower=True),
+            # Experimental: extra frames (~20 ms each) at the end of the greyscale
+            # waveform that drive only white pixels (and the border) to white again.
+            # Counters the grey veil of the GxEPD2_4G waveform. 0 = library waveform.
+            cv.Optional(CONF_GRAYSCALE_WHITE_BOOST, default=0): cv.int_range(min=0, max=255),
         }
     ).extend(cv.polling_component_schema("60s")),
     _validate_arduino,
@@ -72,6 +77,8 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     if config[CONF_GRAYSCALE] and config[CONF_GRAYSCALE_EDGES] == "light":
         cg.add(var.set_light_edges(True))
+    if config[CONF_GRAYSCALE] and config[CONF_GRAYSCALE_WHITE_BOOST] > 0:
+        cg.add(var.set_white_boost(config[CONF_GRAYSCALE_WHITE_BOOST]))
 
     await display.register_display(var, config)
 
