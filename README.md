@@ -127,10 +127,6 @@ display:
   - platform: gdey075t7_gxepd2
     grayscale: true
     grayscale_edges: normal   # or: light (slimmer text)
-    grayscale_white_boost: 0  # experimental, e.g. 20: extra white drive against a grey veil
-    grayscale_refresh: lut    # or: two_pass (experimental, see below)
-    grayscale_light_frames: 4 # two_pass only
-    grayscale_dark_frames: 5  # two_pass only
     # ...
 font:
   - file: "gfonts://Roboto"
@@ -141,10 +137,6 @@ font:
 With `grayscale: true` the component uses [GxEPD2_4G](https://github.com/ZinggJM/GxEPD2_4G) instead of GxEPD2 and reports itself as a greyscale display. Colours are mapped to 4 levels (white, light grey, dark grey, black) by their brightness, so anti-aliased fonts (`bpp: 2`) get smooth edges. Text and layout geometry are unchanged.
 
 `grayscale_edges` controls how partially covered edge pixels are drawn: `normal` maps 1/3 and 2/3 coverage to light and dark grey (smoothest), `light` maps 1/3 to white and 2/3 to light grey — strokes look slimmer while curves stay smooth. Grey levels tend to look darker on the panel than on a monitor.
-
-`grayscale_white_boost` (experimental, default 0) appends N frames (≈20 ms each) to the greyscale waveform in which only white pixels and the border are driven to white again. With the library waveform the white background can look slightly grey on this panel. Grey levels and black are not changed; the refresh takes N × ≈20 ms longer.
-
-`grayscale_refresh: two_pass` (experimental) first runs the panel's factory black/white waveform — clean white and black like in black/white mode — and then a short register-LUT pass that only drives the grey pixels: light grey gets a black pulse of `grayscale_light_frames` from white, dark grey a white pulse of `grayscale_dark_frames` from black (frames ≈ 20 ms). White and black pixels are not driven in the second pass. The pulse lengths depend on the panel and temperature; tune them visually.
 
 Tip: TrueType fonts with their own hinting (e.g. Roboto from Google Fonts) are only hinted vertically when anti-aliased, so vertical stems can land between pixels and some letters look thinner than others. A copy of the font with the hinting instructions removed makes FreeType use its auto-hinter, which snaps all stems to whole pixels.
 
